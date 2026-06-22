@@ -1,13 +1,13 @@
 const RULES: [RegExp, string][] = [
   // Transfers/payments — exclude from spend (check first)
   [
-    /\bcc billpay\b|\bcredit card payment\b|\bcard payment\b|\bbill pay\b|\bbillpay\b|\bpayment to credit card\b|\bpayment on cred\b|\bpaid on cred\b|\bvia cred\b|\bcard bill\b|\bstatement payment\b|\bauto debit\b|\bstanding instruction\b|\bach debit\b|\bmandate\b|\bemi\b|\btransfer\b|cc bill payment|nskaveti2@okaxi/i,
+    /\bcc billpay\b|\bcredit card payment\b|\bcard payment\b|\bbill pay\b|\bbillpay\b|\bpayment to credit card\b|\bpayment on cred\b|\bpaid on cred\b|\bvia cred\b|\bcard bill\b|\bstatement payment\b|\bauto debit\b|\bstanding instruction\b|\bach debit\b|\bmandate\b|\bemi\b|\btransfer\b|cc bill payment|nskaveti|7729945111|gokiwi|\.bdp\b|\bdtax\b|\bself\b|icici bank credit ca|funding a\/c/i,
     'Transfer',
   ],
   [/reward\s*360/i, 'Shopping'],
   [/cashback|refund/i, 'Rewards'],
   [
-    /zerodh|mutual fund(s)?|mf\b|liquidbees?|goldbees?|niftybees?|sensexbees?|etf\b|demat|broking|shares?|stocks?|equity|groww|indmoney|kfintech|cams?|nsdl|cdsl|nps\b|\bsip\b|ramkrishna forgings|indigrid|national aluminium|oracle financial|gokiwi|bommi|trf to fd|fixed deposit|utib0000844/i,
+    /zerodh|mutual fund(s)?|mf\b|liquidbees?|goldbees?|niftybees?|sensexbees?|etf\b|demat|broking|shares?|stocks?|equity|groww|indmoney|kfintech|cams?|nsdl|cdsl|nps\b|\bsip\b|ramkrishna forgings|indigrid|national aluminium|oracle financial|bommi|trf to fd|fixed deposit|bse limite/i,
     'Investments',
   ],
 
@@ -39,7 +39,7 @@ const RULES: [RegExp, string][] = [
   [/iciciprudent|iciciprulife|iciciprulif|pharmacy|medical|hospital|clinic|apollo|diagnostic|\blab\b/i, 'Health'],
 
   // Education
-  [/udemy|coursera|byju|unacademy|school|college|tuition|course|class/i, 'Education'],
+  [/udemy|coursera|byju|unacademy|school|college|tuition|course|class|utib0000844|prepladder|integr/i, 'Education'],
 
   // Entertainment
   [/netflix|spotify|prime video|hotstar|zee5|subscription/i, 'Entertainment'],

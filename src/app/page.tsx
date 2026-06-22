@@ -53,6 +53,12 @@ export default function Dashboard() {
   const [availableYears, setAvailableYears] = useState<number[]>([now.getFullYear()])
   const [loading, setLoading] = useState(true)
 
+  const handleBarClick = useCallback((monthKey: string) => {
+    const [y, m] = monthKey.split('-')
+    setYear(parseInt(y))
+    setMonth(parseInt(m))
+  }, [])
+
   const loadStats = useCallback(async (y: number) => {
     const res = await fetch(`/api/stats?year=${y}`)
     if (res.ok) setStats(await res.json())
@@ -209,7 +215,7 @@ export default function Dashboard() {
             <CardTitle className="text-sm text-gray-500 font-medium">Month on month</CardTitle>
           </CardHeader>
           <CardContent className="pb-4">
-            <TrendChart data={trendData} />
+            <TrendChart data={trendData} activeMonth={currentMonthKey} onBarClick={handleBarClick} />
           </CardContent>
         </Card>
       )}
