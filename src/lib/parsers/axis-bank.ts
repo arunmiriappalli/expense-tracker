@@ -1,18 +1,28 @@
 import { ParsedTransaction } from '@/types'
 import { categorize } from '@/lib/categorize'
 
-// pdfjs produces one item per line; transaction section layout:
+// pdfjs produces one item per line. Two statement formats exist:
+//
+// 2026+ format (date-only line):
 //   "Opening Balance"
-//   OPENING_BALANCE_VALUE
+//   BALANCE
 //   DD-MM-YYYY
 //   DESCRIPTION
 //   AMOUNT
 //   BALANCE
-//   ... (repeating)
-//   "Closing Balance"
+//
+// 2024 format (date+description on same line):
+//   "Opening Balance"
+//   BALANCE
+//   DD-MM-YYYY DESCRIPTION_PART1
+//   [optional continuation lines]
+//   AMOUNT
+//   BALANCE   (may be "BALANCE_VALUEPage N of M" at page breaks)
+//
 // Direction (credit/debit) is derived from balance delta vs previous balance.
 
-const DATE_LINE = /^\d{2}-\d{2}-\d{4}$/
+const DATE_ONLY = /^\d{2}-\d{2}-\d{4}$/
+const DATE_WITH_DESC = /^(\d{2}-\d{2}-\d{4})\s+(.+)/
 const NUMBER_LINE = /^[\d,]+\.\d{2}$/
 
 function toIsoDate(d: string): string {
@@ -48,12 +58,34 @@ export function parseAxisBank(text: string): ParsedTransaction[] {
   let txDesc = ''
   let txAmount = 0
 
+  function emit(balance: number) {
+    if (!txDate || !txAmount) return
+    const type: 'credit' | 'debit' = prevBalance !== null && balance > prevBalance ? 'credit' : 'debit'
+    const description = cleanDesc(txDesc)
+    transactions.push({
+      date: toIsoDate(txDate),
+      description,
+      amount: txAmount,
+      type,
+      category: categorize(description),
+      source: 'axis_bank',
+      cardHolder: 'spouse',
+    })
+    prevBalance = balance
+    state = 'idle'; txDate = ''; txDesc = ''; txAmount = 0
+  }
+
   for (const line of lines) {
     if (/^Closing Balance/i.test(line) || /^To know your Tariff/i.test(line)) {
       inTable = false; continue
     }
 
-    if (line === 'Opening Balance') { awaitingOpenBal = true; continue }
+    if (/^Opening Balance/i.test(line)) {
+      const inline = line.match(/([\d,]+\.\d{2})/)
+      if (inline) { prevBalance = pa(inline[1]); inTable = true }
+      else { awaitingOpenBal = true }
+      continue
+    }
     if (awaitingOpenBal) {
       if (NUMBER_LINE.test(line)) { prevBalance = pa(line); inTable = true }
       awaitingOpenBal = false; continue
@@ -61,35 +93,33 @@ export function parseAxisBank(text: string): ParsedTransaction[] {
 
     if (!inTable) continue
 
-    if (DATE_LINE.test(line)) {
-      txDate = line; txDesc = ''; txAmount = 0; state = 'got_date'; continue
+    // A new date line always starts a fresh transaction (flushes any partial state)
+    const dateWithDesc = DATE_WITH_DESC.exec(line)
+    if (dateWithDesc) {
+      txDate = dateWithDesc[1]; txDesc = dateWithDesc[2]; txAmount = 0; state = 'got_desc'
+      continue
     }
+    if (DATE_ONLY.test(line)) {
+      txDate = line; txDesc = ''; txAmount = 0; state = 'got_date'
+      continue
+    }
+
     if (state === 'idle') continue
 
-    if (state === 'got_date') { txDesc = line; state = 'got_desc'; continue }
+    if (state === 'got_date') {
+      txDesc = line; state = 'got_desc'; continue
+    }
 
     if (state === 'got_desc') {
       if (NUMBER_LINE.test(line)) { txAmount = pa(line); state = 'got_amount' }
+      else { txDesc += ' ' + line } // multi-line description continuation
       continue
     }
 
     if (state === 'got_amount') {
-      if (NUMBER_LINE.test(line)) {
-        const balance = pa(line)
-        const type: 'credit' | 'debit' = prevBalance !== null && balance > prevBalance ? 'credit' : 'debit'
-        const description = cleanDesc(txDesc)
-        transactions.push({
-          date: toIsoDate(txDate),
-          description,
-          amount: txAmount,
-          type,
-          category: categorize(description),
-          source: 'axis_bank',
-          cardHolder: 'spouse',
-        })
-        prevBalance = balance
-        state = 'idle'; txDate = ''; txDesc = ''; txAmount = 0
-      }
+      // Balance may be "1,26,485.61" or "1,48,597.50Page 3 of 6" at page breaks
+      const balMatch = line.match(/^([\d,]+\.\d{2})/)
+      if (balMatch) emit(pa(balMatch[1]))
       continue
     }
   }

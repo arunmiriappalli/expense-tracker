@@ -29,7 +29,7 @@ const SENDER_RULES: SenderRule[] = [
       'estatement@icicibank.com',
       'estatement@icici.bank.in',
     ],
-    passwords: ['PDF_PASSWORD_ICICI_BANK'],
+    passwords: ['PDF_PASSWORD_ICICI_BANK', 'PDF_PASSWORD_ICICI_BANK_OLD'],
   },
   {
     key: 'icici_cc',
@@ -139,7 +139,11 @@ function dbFailureError(source: string, account: SyncAccount, message: string): 
 }
 
 function isAnnualIciciStatement(subject: string): boolean {
-  return /icici bank statement from .* to .*march 31, \d{4}/i.test(subject) || /annual statement/i.test(subject)
+  return (
+    /icici bank statement from .* to .*march 31, \d{4}/i.test(subject) ||
+    /icici bank statement from .* to 31-03-\d{4}/i.test(subject) ||
+    /annual statement/i.test(subject)
+  )
 }
 
 function logProcessing(account: SyncAccount, subject: string, from: string, rule: SenderRule | null) {
@@ -293,7 +297,7 @@ async function syncAccount(
         }
       }
 
-      const parsed = parseStatement(text)
+      const parsed = parseStatement(text, msg.fromEmail)
       if (!parsed) { results.skipped++; continue }
 
       results.parsed++
@@ -302,7 +306,7 @@ async function syncAccount(
         // A recognised statement with 0 transactions almost always means a parser/format
         // mismatch. Don't mark as seen so a fixed parser can pick it up on the next sync.
         const preview = text.split('\n').map(l => l.trim()).filter(Boolean).slice(0, 80).join('\n')
-        console.warn(`[gmail:${account}] 0 transactions from ${parsed.source} — first 80 lines:\n${preview}`)
+        console.warn(`[gmail:${account}] 0 transactions from ${parsed.source} subject="${msg.subject}" — first 80 lines:\n${preview}`)
         results.errors.push(parseFailureError(parsed.source, account))
         shouldRetry = true // don't mark as seen — retry next sync after parser fix
         continue
@@ -314,22 +318,30 @@ async function syncAccount(
       const statementMonth = refDate.getMonth() + 1
       const statementYear = refDate.getFullYear()
 
-      const rows = transactions.map(t => ({
-        date: t.date,
-        description: t.description,
-        amount: t.amount,
-        type: t.type,
-        category: t.category,
-        source: t.source,
-        source_file_name: sanitizeSourceFileName(part.filename, msg.subject),
-        card_holder: t.cardHolder,
-        statement_month: statementMonth,
-        statement_year: statementYear,
-      }))
+      const sourceFileName = sanitizeSourceFileName(part.filename, msg.subject)
+      const seen = new Set<string>()
+      const rows = transactions
+        .map(t => ({
+          date: t.date,
+          description: t.description.slice(0, 800),
+          amount: t.amount,
+          type: t.type,
+          category: t.category,
+          source: t.source,
+          source_file_name: sourceFileName,
+          card_holder: t.cardHolder,
+          statement_month: statementMonth,
+          statement_year: statementYear,
+        }))
+        .filter(r => {
+          const key = `${r.date}|${r.amount}|${r.description}|${r.source}`
+          if (seen.has(key)) return false
+          seen.add(key); return true
+        })
 
       const { data, error } = await supabase
         .from('transactions')
-        .upsert(rows, { onConflict: 'date,amount,description,source', ignoreDuplicates: true })
+        .upsert(rows, { onConflict: 'date,amount,description,source', ignoreDuplicates: false })
         .select('id')
 
       if (error) {

@@ -24,6 +24,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <span className="font-semibold text-gray-900">💰 Spends</span>
             <div className="flex gap-5">
               <a href="/" className="text-sm text-gray-600 hover:text-gray-900">Dashboard</a>
+              <a href="/summary" className="text-sm text-gray-600 hover:text-gray-900">Summary</a>
               <a href="/upload" className="text-sm text-gray-600 hover:text-gray-900">Upload</a>
             </div>
           </div>

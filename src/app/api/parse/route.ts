@@ -24,23 +24,29 @@ export async function POST(req: NextRequest) {
   const statementMonth = refDate.getMonth() + 1
   const statementYear = refDate.getFullYear()
 
-  const rows = transactions.map(t => ({
-    date: t.date,
-    description: t.description,
-    amount: t.amount,
-    type: t.type,
-    category: t.category,
-    source: t.source,
-    source_file_name: file.name,
-    card_holder: t.cardHolder,
-    statement_month: statementMonth,
-    statement_year: statementYear,
-  }))
+  const seen = new Set<string>()
+  const rows = transactions
+    .map(t => ({
+      date: t.date,
+      description: t.description.slice(0, 800),
+      amount: t.amount,
+      type: t.type,
+      category: t.category,
+      source: t.source,
+      source_file_name: file.name,
+      card_holder: t.cardHolder,
+      statement_month: statementMonth,
+      statement_year: statementYear,
+    }))
+    .filter(r => {
+      const key = `${r.date}|${r.amount}|${r.description}|${r.source}`
+      if (seen.has(key)) return false
+      seen.add(key); return true
+    })
 
-  // Upsert — skip duplicates silently
   const { error, data } = await supabase
     .from('transactions')
-    .upsert(rows, { onConflict: 'date,amount,description,source', ignoreDuplicates: true })
+    .upsert(rows, { onConflict: 'date,amount,description,source', ignoreDuplicates: false })
     .select('id')
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })

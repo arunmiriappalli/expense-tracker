@@ -19,6 +19,7 @@ interface StatsData {
     total: number
     byCategory: Record<string, number>
     byHolder: Record<'self' | 'spouse', number>
+    byCategoryHolder: Record<string, Record<'self' | 'spouse', number>>
   }>
   spendByMonth: Record<string, {
     total: number
@@ -56,6 +57,7 @@ export default function Dashboard() {
   const [categoryFilter, setCategoryFilter] = useState('all')
   const [stats, setStats] = useState<StatsData | null>(null)
   const [transactions, setTransactions] = useState<Transaction[]>([])
+  const [availableYears, setAvailableYears] = useState<number[]>([now.getFullYear()])
   const [loading, setLoading] = useState(true)
 
   const loadStats = useCallback(async (y: number) => {
@@ -70,6 +72,12 @@ export default function Dashboard() {
     setLoading(false)
   }, [])
 
+  useEffect(() => {
+    fetch('/api/years').then(r => r.json()).then((years: number[]) => {
+      if (years.length) setAvailableYears(years)
+    }).catch(() => {})
+  }, [])
+  useEffect(() => { document.title = `${MONTHS[month - 1]} ${year} · Spends` }, [month, year])
   useEffect(() => { loadStats(year) }, [year, loadStats])
   useEffect(() => { loadTransactions(year, month) }, [year, month, loadTransactions])
 
@@ -79,13 +87,14 @@ export default function Dashboard() {
   const monthSpendTotal = currentMonthSpendData?.total ?? 0
   const monthActivityTotal = currentMonthActivityData?.total ?? 0
   const monthCategories = currentMonthActivityData?.byCategory ?? {}
+  const monthCategoryHolder = currentMonthActivityData?.byCategoryHolder ?? {}
   const monthByHolder = currentMonthSpendData?.byHolder ?? { self: 0, spouse: 0 }
 
   const trendData = Object.entries(stats?.spendByMonth ?? {})
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([m, d]) => ({ month: m, total: d.total }))
 
-  const availableMonths = Object.keys(stats?.spendByMonth ?? {}).map(k => {
+  const availableMonths = Object.keys(stats?.byMonth ?? {}).map(k => {
     const [, m] = k.split('-')
     return parseInt(m)
   })
@@ -126,7 +135,7 @@ export default function Dashboard() {
             value={year}
             onChange={e => setYear(parseInt(e.target.value))}
           >
-            {[2024, 2025, 2026].map(y => (
+            {availableYears.map(y => (
               <option key={y} value={y}>{y}</option>
             ))}
           </select>
@@ -134,17 +143,25 @@ export default function Dashboard() {
       </div>
 
       {/* Annual summary */}
-      {stats && (
-        <Card className="bg-blue-600 text-white border-0">
-          <CardContent className="pt-4 pb-4">
-            <p className="text-blue-100 text-sm">Annual spend {year}</p>
-            <p className="text-3xl font-bold mt-0.5">{fmt(stats.annualTotal)}</p>
-            <p className="text-blue-200 text-xs mt-1">
-              All money out: {fmt(stats.annualActivityTotal)}
-            </p>
-          </CardContent>
-        </Card>
-      )}
+      {stats && (() => {
+        const monthsWithData = Object.keys(stats.spendByMonth).length
+        const divisor = Math.min(monthsWithData, 12) || 1
+        const avgMonthly = stats.annualTotal / divisor
+        return (
+          <Card className="bg-blue-600 text-white border-0">
+            <CardContent className="pt-4 pb-4">
+              <p className="text-blue-100 text-sm">Annual spend {year}</p>
+              <p className="text-3xl font-bold mt-0.5">{fmt(stats.annualTotal)}</p>
+              <p className="text-blue-200 text-xs mt-1">
+                Avg/month: {fmt(avgMonthly)} · over {divisor} month{divisor !== 1 ? 's' : ''}
+              </p>
+              <p className="text-blue-200 text-xs mt-0.5">
+                All money out: {fmt(stats.annualActivityTotal)}
+              </p>
+            </CardContent>
+          </Card>
+        )
+      })()}
 
       {/* Monthly split by person */}
       {(currentMonthSpendData || currentMonthActivityData) && (
@@ -202,19 +219,41 @@ export default function Dashboard() {
       {/* Top categories list */}
       {Object.keys(monthCategories).length > 0 && (
         <div className="space-y-2">
-          {Object.entries(monthCategories)
-            .sort((a, b) => b[1] - a[1])
-            .map(([cat, amt]) => (
-              <div key={cat} className="flex items-center justify-between bg-white rounded-xl px-4 py-3">
-                <span className="text-sm text-gray-700">{cat}</span>
-                <div className="text-right">
-                  <span className="text-sm font-semibold text-gray-900">{fmt(amt)}</span>
-                  <span className="text-xs text-gray-400 ml-2">
-                    {monthActivityTotal > 0 ? Math.round((amt / monthActivityTotal) * 100) : 0}%
-                  </span>
-                </div>
-              </div>
-            ))}
+          {(() => {
+            const baseTotal = Object.entries(monthCategories)
+              .filter(([cat]) => cat !== 'Investments')
+              .reduce((sum, [, amt]) => sum + amt, 0)
+            return Object.entries(monthCategories)
+              .sort((a, b) => b[1] - a[1])
+              .map(([cat, amt]) => {
+                const holders = monthCategoryHolder[cat]
+                const selfAmt = holders?.self ?? 0
+                const spouseAmt = holders?.spouse ?? 0
+                const bothPresent = selfAmt > 0 && spouseAmt > 0
+                return (
+                  <div key={cat} className="flex items-center justify-between bg-white rounded-xl px-4 py-3">
+                    <span className="text-sm text-gray-700">{cat}</span>
+                    <div className="text-right">
+                      <div>
+                        <span className="text-sm font-semibold text-gray-900">{fmt(amt)}</span>
+                        {cat !== 'Investments' && (
+                          <span className="text-xs text-gray-400 ml-2">
+                            {baseTotal > 0 ? Math.round((amt / baseTotal) * 100) : 0}%
+                          </span>
+                        )}
+                      </div>
+                      {bothPresent && (
+                        <div className="text-xs text-gray-400 mt-0.5">
+                          <span>{fmt(selfAmt)}</span>
+                          <span className="mx-1">·</span>
+                          <span className="text-rose-400">{fmt(spouseAmt)}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )
+              })
+          })()}
         </div>
       )}
 

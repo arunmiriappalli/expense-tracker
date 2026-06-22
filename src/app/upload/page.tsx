@@ -45,6 +45,8 @@ function GmailSection() {
   } | null>(null)
   const [flashMsg, setFlashMsg] = useState<string | null>(null)
 
+  useEffect(() => { document.title = 'Upload · Spends' }, [])
+
   useEffect(() => {
     const gmailParam = searchParams.get('gmail')
     const accountParam = searchParams.get('account')

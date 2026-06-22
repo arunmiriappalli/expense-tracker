@@ -1,5 +1,7 @@
 'use client'
 
+import { useState } from 'react'
+
 interface Transaction {
   id: string
   date: string
@@ -63,6 +65,27 @@ function formatDate(d: string) {
   return new Date(d).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })
 }
 
+function CopyBadge({ fileName }: { fileName: string }) {
+  const [copied, setCopied] = useState(false)
+
+  function handleClick() {
+    navigator.clipboard.writeText(fileName).then(() => {
+      setCopied(true)
+      setTimeout(() => setCopied(false), 1500)
+    })
+  }
+
+  return (
+    <button
+      onClick={handleClick}
+      title={fileName}
+      className="text-[10px] px-2 py-0.5 rounded-full font-medium bg-amber-100 text-amber-700 hover:bg-amber-200 transition-colors truncate max-w-40 cursor-pointer"
+    >
+      {copied ? 'Copied!' : `PDF: ${trimFileName(fileName)}`}
+    </button>
+  )
+}
+
 export function TransactionList({ transactions }: { transactions: Transaction[] }) {
   if (!transactions.length) {
     return <p className="text-center text-gray-400 py-8">No transactions found</p>
@@ -71,9 +94,9 @@ export function TransactionList({ transactions }: { transactions: Transaction[] 
   return (
     <div className="divide-y divide-gray-50">
       {transactions.map(tx => (
-        <div key={tx.id} className="flex items-center gap-3 py-3 px-1">
+        <div key={tx.id} className="flex items-start gap-3 py-3 px-1">
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium text-gray-900 truncate">{tx.description}</p>
+            <p className="text-sm font-medium text-gray-900 break-words">{tx.description}</p>
             <div className="flex items-center gap-2 mt-0.5">
               <span className="text-xs text-gray-400">{formatDate(tx.date)}</span>
               <span className="text-xs text-gray-300">·</span>
@@ -84,9 +107,7 @@ export function TransactionList({ transactions }: { transactions: Transaction[] 
                 {HOLDER_LABEL[tx.card_holder] ?? tx.card_holder}
               </span>
               {tx.source_file_name && (
-                <span className="text-[10px] px-2 py-0.5 rounded-full font-medium bg-amber-100 text-amber-700 truncate max-w-40">
-                  PDF: {trimFileName(tx.source_file_name)}
-                </span>
+                <CopyBadge fileName={tx.source_file_name} />
               )}
             </div>
           </div>

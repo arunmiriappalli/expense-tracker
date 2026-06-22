@@ -19,6 +19,7 @@ function fmt(n: number) {
 
 export function CategoryChart({ data }: Props) {
   const entries = Object.entries(data)
+    .filter(([name]) => name !== 'Investments')
     .sort((a, b) => b[1] - a[1])
     .map(([name, value]) => ({ name, value }))
 
