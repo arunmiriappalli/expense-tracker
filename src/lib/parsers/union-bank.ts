@@ -1,5 +1,6 @@
 import { ParsedTransaction } from '@/types'
 import { categorize } from '@/lib/categorize'
+import { pa, toIsoDate } from './utils'
 
 // pdfjs produces one item per line; each transaction spans N lines:
 //   SI_NUMBER
@@ -17,15 +18,6 @@ const BALANCE_LINE = /^([\d,]+\.\d{2})\s+Cr$/
 const SI_LINE = /^\d{1,3}$/
 const STOP = /^Summary\s*:|^Total\s+Debits|^Total\s+Credits/i
 const HEADER_ITEMS = new Set(['SI', 'Date', 'Particulars', 'Chq Num', 'Withdrawal', 'Deposit', 'Balance'])
-
-function toIsoDate(d: string): string {
-  const [dd, mm, yyyy] = d.split('-')
-  return `${yyyy}-${mm}-${dd}`
-}
-
-function pa(s: string): number {
-  return parseFloat(s.replace(/,/g, ''))
-}
 
 function cleanDesc(parts: string[]): string {
   const raw = parts.join(' ')
@@ -110,7 +102,7 @@ export function parseUnionBank(text: string): ParsedTransaction[] {
         const type: 'credit' | 'debit' = prevBalance !== null && balance > prevBalance ? 'credit' : 'debit'
         const description = cleanDesc(txDescParts)
         transactions.push({
-          date: toIsoDate(txDate),
+          date: toIsoDate(txDate, '-'),
           description,
           amount: txAmount,
           type,

@@ -1,5 +1,6 @@
 import { ParsedTransaction, StatementSource } from '@/types'
 import { categorize } from '@/lib/categorize'
+import { pa, toIsoDate } from './utils'
 
 // pdfjs puts each column cell on its own line. A transaction block looks like:
 //
@@ -23,15 +24,6 @@ const SERIAL_RE = /^\d{8,12}$/       // transaction reference number
 const REWARDS_RE = /^\d{1,5}$/       // reward points: small integer (0–99999)
 const AMOUNT_RE = /^([\d,]+\.\d{2})\s*(CR)?$/i
 const CARD_RE = /^\d{4}X+\d{4}$/
-
-function pa(s: string): number {
-  return parseFloat(s.replace(/,/g, ''))
-}
-
-function toIsoDate(d: string): string {
-  const [dd, mm, yyyy] = d.split('/')
-  return `${yyyy}-${mm}-${dd}`
-}
 
 function cleanDesc(raw: string): string {
   return raw

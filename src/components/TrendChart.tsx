@@ -1,6 +1,8 @@
 'use client'
 
+import React from 'react'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts'
+import { fmt, MONTHS } from '@/lib/utils'
 
 interface MonthData {
   month: string
@@ -11,18 +13,10 @@ interface Props {
   data: MonthData[]
 }
 
-const MONTH_ABBR = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
-
-function fmt(n: number) {
-  if (n >= 100000) return `₹${(n / 100000).toFixed(1)}L`
-  if (n >= 1000) return `₹${(n / 1000).toFixed(0)}K`
-  return `₹${n.toFixed(0)}`
-}
-
-export function TrendChart({ data }: Props) {
+export const TrendChart = React.memo(function TrendChart({ data }: Props) {
   const chartData = data.map(d => {
     const [, m] = d.month.split('-')
-    return { month: MONTH_ABBR[parseInt(m) - 1], total: d.total }
+    return { month: MONTHS[parseInt(m) - 1], total: d.total }
   })
 
   return (
@@ -36,4 +30,4 @@ export function TrendChart({ data }: Props) {
       </BarChart>
     </ResponsiveContainer>
   )
-}
+})

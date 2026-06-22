@@ -3,6 +3,7 @@ import { supabase } from '@/lib/supabase/client'
 import { getAccessToken, searchMessages, getMessage, downloadAttachment } from '@/lib/gmail'
 import { extractTextFromPdf } from '@/lib/pdf'
 import { parseStatement } from '@/lib/parsers'
+import { upsertTransactions } from '@/lib/db/upsertTransactions'
 
 type SyncAccount = 'self' | 'spouse'
 
@@ -104,10 +105,6 @@ function buildSenderClause(account: SyncAccount): string {
   return `(${senders.map((sender) => `from:${sender}`).join(' OR ')})`
 }
 
-function clonePdfBytes(bytes: Buffer): Buffer {
-  return Buffer.from(bytes)
-}
-
 function resolveSenderRule(fromEmail: string, account?: SyncAccount): SenderRule | null {
   const from = fromEmail.toLowerCase()
   const rules = SENDER_RULES.filter(rule => !account || rule.account === account)
@@ -195,7 +192,7 @@ async function syncAccount(
     .single()
 
   const afterDate = lastSyncRow?.value
-    ? (() => { const d = new Date(lastSyncRow.value); d.setDate(d.getDate() - 7); return d })()
+    ? new Date(new Date(lastSyncRow.value).setDate(new Date(lastSyncRow.value).getDate() - 7))
     : new Date('2024-01-01')
 
   const afterStr = [
@@ -262,7 +259,7 @@ async function syncAccount(
 
       let text = ''
       try {
-        text = await extractTextFromPdf(clonePdfBytes(attachmentBytes))
+        text = await extractTextFromPdf(Buffer.from(attachmentBytes))
       } catch (err: unknown) {
         const e = err as { name?: string }
         if (e.name === 'PasswordException') {
@@ -275,7 +272,7 @@ async function syncAccount(
           let unlocked = false
           for (const pw of passwords) {
             try {
-              text = await extractTextFromPdf(clonePdfBytes(attachmentBytes), pw, { logPasswordErrors: false })
+              text = await extractTextFromPdf(Buffer.from(attachmentBytes), pw, { logPasswordErrors: false })
               unlocked = true
               break
             } catch {
@@ -313,41 +310,13 @@ async function syncAccount(
       }
       const { transactions } = parsed
 
-      const dates = transactions.map(t => t.date).sort()
-      const refDate = new Date(dates[dates.length - 1] ?? new Date().toISOString())
-      const statementMonth = refDate.getMonth() + 1
-      const statementYear = refDate.getFullYear()
-
       const sourceFileName = sanitizeSourceFileName(part.filename, msg.subject)
-      const seen = new Set<string>()
-      const rows = transactions
-        .map(t => ({
-          date: t.date,
-          description: t.description.slice(0, 800),
-          amount: t.amount,
-          type: t.type,
-          category: t.category,
-          source: t.source,
-          source_file_name: sourceFileName,
-          card_holder: t.cardHolder,
-          statement_month: statementMonth,
-          statement_year: statementYear,
-        }))
-        .filter(r => {
-          const key = `${r.date}|${r.amount}|${r.description}|${r.source}`
-          if (seen.has(key)) return false
-          seen.add(key); return true
-        })
-
-      const { data, error } = await supabase
-        .from('transactions')
-        .upsert(rows, { onConflict: 'date,amount,description,source', ignoreDuplicates: false })
-        .select('id')
+      const { inserted, error } = await upsertTransactions(transactions, sourceFileName)
 
       if (error) {
-        results.errors.push(dbFailureError(parsed.source, account, error.message))
+        results.errors.push(dbFailureError(parsed.source, account, error))
       } else {
-        results.inserted += data?.length ?? 0
+        results.inserted += inserted
       }
     }
 

@@ -1,18 +1,11 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { CategoryChart } from '@/components/CategoryChart'
 import { TrendChart } from '@/components/TrendChart'
 import { TransactionList } from '@/components/TransactionList'
-
-const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
-
-function fmt(n: number) {
-  if (n >= 100000) return `₹${(n / 100000).toFixed(1)}L`
-  if (n >= 1000) return `₹${(n / 1000).toFixed(1)}K`
-  return `₹${n.toFixed(0)}`
-}
+import { fmt, MONTHS } from '@/lib/utils'
 
 interface StatsData {
   byMonth: Record<string, {
@@ -44,7 +37,7 @@ interface Transaction {
   category: string
   source: string
   source_file_name: string
-  card_holder: string
+  card_holder: 'self' | 'spouse'
   statement_month: number
   statement_year: number
 }
@@ -85,30 +78,52 @@ export default function Dashboard() {
   const currentMonthSpendData = stats?.spendByMonth[currentMonthKey]
   const currentMonthActivityData = stats?.byMonth[currentMonthKey]
   const monthSpendTotal = currentMonthSpendData?.total ?? 0
-  const monthActivityTotal = currentMonthActivityData?.total ?? 0
   const monthCategories = currentMonthActivityData?.byCategory ?? {}
   const monthCategoryHolder = currentMonthActivityData?.byCategoryHolder ?? {}
   const monthByHolder = currentMonthSpendData?.byHolder ?? { self: 0, spouse: 0 }
 
-  const trendData = Object.entries(stats?.spendByMonth ?? {})
-    .sort(([a], [b]) => a.localeCompare(b))
-    .map(([m, d]) => ({ month: m, total: d.total }))
+  const trendData = useMemo(() =>
+    Object.entries(stats?.spendByMonth ?? {})
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([m, d]) => ({ month: m, total: d.total })),
+    [stats]
+  )
 
-  const availableMonths = Object.keys(stats?.byMonth ?? {}).map(k => {
-    const [, m] = k.split('-')
-    return parseInt(m)
-  })
+  const availableMonths = useMemo(() =>
+    Object.keys(stats?.byMonth ?? {}).map(k => parseInt(k.split('-')[1])),
+    [stats]
+  )
 
-  const transactionCategories = Array.from(new Set(transactions.map(tx => tx.category))).sort((a, b) => a.localeCompare(b))
-  const filteredTransactions = transactions
-    .filter(tx => holderFilter === 'all' || tx.card_holder === holderFilter)
-    .filter(tx => categoryFilter === 'all' || tx.category === categoryFilter)
-    .slice()
-    .sort((a, b) => {
-      const diff = b.amount - a.amount
-      if (diff !== 0) return diff
-      return b.date.localeCompare(a.date)
-    })
+  const transactionCategories = useMemo(() =>
+    Array.from(new Set(transactions.map(tx => tx.category))).sort((a, b) => a.localeCompare(b)),
+    [transactions]
+  )
+
+  const filteredTransactions = useMemo(() =>
+    transactions
+      .filter(tx => holderFilter === 'all' || tx.card_holder === holderFilter)
+      .filter(tx => categoryFilter === 'all' || tx.category === categoryFilter)
+      .slice()
+      .sort((a, b) => {
+        const diff = b.amount - a.amount
+        if (diff !== 0) return diff
+        return b.date.localeCompare(a.date)
+      }),
+    [transactions, holderFilter, categoryFilter]
+  )
+
+  const { avgMonthly, avgDivisor } = useMemo(() => {
+    if (!stats) return { avgMonthly: 0, avgDivisor: 1 }
+    const divisor = Math.min(Object.keys(stats.spendByMonth).length, 12) || 1
+    return { avgMonthly: stats.annualTotal / divisor, avgDivisor: divisor }
+  }, [stats])
+
+  const monthBaseTotal = useMemo(() =>
+    Object.entries(monthCategories)
+      .filter(([cat]) => cat !== 'Investments')
+      .reduce((sum, [, amt]) => sum + amt, 0),
+    [monthCategories]
+  )
 
   return (
     <div className="space-y-4">
@@ -143,25 +158,20 @@ export default function Dashboard() {
       </div>
 
       {/* Annual summary */}
-      {stats && (() => {
-        const monthsWithData = Object.keys(stats.spendByMonth).length
-        const divisor = Math.min(monthsWithData, 12) || 1
-        const avgMonthly = stats.annualTotal / divisor
-        return (
-          <Card className="bg-blue-600 text-white border-0">
-            <CardContent className="pt-4 pb-4">
-              <p className="text-blue-100 text-sm">Annual spend {year}</p>
-              <p className="text-3xl font-bold mt-0.5">{fmt(stats.annualTotal)}</p>
-              <p className="text-blue-200 text-xs mt-1">
-                Avg/month: {fmt(avgMonthly)} · over {divisor} month{divisor !== 1 ? 's' : ''}
-              </p>
-              <p className="text-blue-200 text-xs mt-0.5">
-                All money out: {fmt(stats.annualActivityTotal)}
-              </p>
-            </CardContent>
-          </Card>
-        )
-      })()}
+      {stats && (
+        <Card className="bg-blue-600 text-white border-0">
+          <CardContent className="pt-4 pb-4">
+            <p className="text-blue-100 text-sm">Annual spend {year}</p>
+            <p className="text-3xl font-bold mt-0.5">{fmt(stats.annualTotal)}</p>
+            <p className="text-blue-200 text-xs mt-1">
+              Avg/month: {fmt(avgMonthly)} · over {avgDivisor} month{avgDivisor !== 1 ? 's' : ''}
+            </p>
+            <p className="text-blue-200 text-xs mt-0.5">
+              All money out: {fmt(stats.annualActivityTotal)}
+            </p>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Monthly split by person */}
       {(currentMonthSpendData || currentMonthActivityData) && (
@@ -219,41 +229,36 @@ export default function Dashboard() {
       {/* Top categories list */}
       {Object.keys(monthCategories).length > 0 && (
         <div className="space-y-2">
-          {(() => {
-            const baseTotal = Object.entries(monthCategories)
-              .filter(([cat]) => cat !== 'Investments')
-              .reduce((sum, [, amt]) => sum + amt, 0)
-            return Object.entries(monthCategories)
-              .sort((a, b) => b[1] - a[1])
-              .map(([cat, amt]) => {
-                const holders = monthCategoryHolder[cat]
-                const selfAmt = holders?.self ?? 0
-                const spouseAmt = holders?.spouse ?? 0
-                const bothPresent = selfAmt > 0 && spouseAmt > 0
-                return (
-                  <div key={cat} className="flex items-center justify-between bg-white rounded-xl px-4 py-3">
-                    <span className="text-sm text-gray-700">{cat}</span>
-                    <div className="text-right">
-                      <div>
-                        <span className="text-sm font-semibold text-gray-900">{fmt(amt)}</span>
-                        {cat !== 'Investments' && (
-                          <span className="text-xs text-gray-400 ml-2">
-                            {baseTotal > 0 ? Math.round((amt / baseTotal) * 100) : 0}%
-                          </span>
-                        )}
-                      </div>
-                      {bothPresent && (
-                        <div className="text-xs text-gray-400 mt-0.5">
-                          <span>{fmt(selfAmt)}</span>
-                          <span className="mx-1">·</span>
-                          <span className="text-rose-400">{fmt(spouseAmt)}</span>
-                        </div>
+          {Object.entries(monthCategories)
+            .sort((a, b) => b[1] - a[1])
+            .map(([cat, amt]) => {
+              const holders = monthCategoryHolder[cat]
+              const selfAmt = holders?.self ?? 0
+              const spouseAmt = holders?.spouse ?? 0
+              const bothPresent = selfAmt > 0 && spouseAmt > 0
+              return (
+                <div key={cat} className="flex items-center justify-between bg-white rounded-xl px-4 py-3">
+                  <span className="text-sm text-gray-700">{cat}</span>
+                  <div className="text-right">
+                    <div>
+                      <span className="text-sm font-semibold text-gray-900">{fmt(amt)}</span>
+                      {cat !== 'Investments' && (
+                        <span className="text-xs text-gray-400 ml-2">
+                          {monthBaseTotal > 0 ? Math.round((amt / monthBaseTotal) * 100) : 0}%
+                        </span>
                       )}
                     </div>
+                    {bothPresent && (
+                      <div className="text-xs text-gray-400 mt-0.5">
+                        <span>{fmt(selfAmt)}</span>
+                        <span className="mx-1">·</span>
+                        <span className="text-rose-400">{fmt(spouseAmt)}</span>
+                      </div>
+                    )}
                   </div>
-                )
-              })
-          })()}
+                </div>
+              )
+            })}
         </div>
       )}
 

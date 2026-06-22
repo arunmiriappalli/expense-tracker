@@ -1,5 +1,6 @@
 import { ParsedTransaction } from '@/types'
 import { categorize } from '@/lib/categorize'
+import { pa, toIsoDate } from './utils'
 
 // pdfjs puts each column cell on its own line. A transaction block looks like:
 //
@@ -16,15 +17,6 @@ import { categorize } from '@/lib/categorize'
 
 const AMOUNT_RE = /^[\d,]+\.\d{2}$/
 const DATE_RE = /^\d{2}-\d{2}-\d{4}$/
-
-function pa(s: string): number {
-  return parseFloat(s.replace(/,/g, ''))
-}
-
-function toIsoDate(d: string): string {
-  const [dd, mm, yyyy] = d.split('-')
-  return `${yyyy}-${mm}-${dd}`
-}
 
 export function parseIciciBank(text: string): ParsedTransaction[] {
   const lines = text.split('\n').map(l => l.trim()).filter(Boolean)
@@ -50,7 +42,7 @@ export function parseIciciBank(text: string): ParsedTransaction[] {
     const type: 'credit' | 'debit' = prevBalance !== null && balance > prevBalance ? 'credit' : 'debit'
     const description = descLines.join(' ').trim() || 'Unknown'
     transactions.push({
-      date: toIsoDate(txDate),
+      date: toIsoDate(txDate, '-'),
       description,
       amount: txAmt,
       type,

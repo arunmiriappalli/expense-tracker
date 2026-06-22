@@ -1,5 +1,6 @@
 import { ParsedTransaction } from '@/types'
 import { categorize } from '@/lib/categorize'
+import { pa, toIsoDate } from './utils'
 
 // pdfjs produces one item per line. Two statement formats exist:
 //
@@ -24,15 +25,6 @@ import { categorize } from '@/lib/categorize'
 const DATE_ONLY = /^\d{2}-\d{2}-\d{4}$/
 const DATE_WITH_DESC = /^(\d{2}-\d{2}-\d{4})\s+(.+)/
 const NUMBER_LINE = /^[\d,]+\.\d{2}$/
-
-function toIsoDate(d: string): string {
-  const [dd, mm, yyyy] = d.split('-')
-  return `${yyyy}-${mm}-${dd}`
-}
-
-function pa(s: string): number {
-  return parseFloat(s.replace(/,/g, ''))
-}
 
 function cleanDesc(raw: string): string {
   const upiTo = raw.match(/UPI(?:\s+TRANSFER)?\s+TO\s+(.+?)\s*\(\d+\)/i)
@@ -63,7 +55,7 @@ export function parseAxisBank(text: string): ParsedTransaction[] {
     const type: 'credit' | 'debit' = prevBalance !== null && balance > prevBalance ? 'credit' : 'debit'
     const description = cleanDesc(txDesc)
     transactions.push({
-      date: toIsoDate(txDate),
+      date: toIsoDate(txDate, '-'),
       description,
       amount: txAmount,
       type,

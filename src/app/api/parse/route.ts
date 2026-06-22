@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { extractTextFromPdf } from '@/lib/pdf'
 import { parseStatement } from '@/lib/parsers'
-import { supabase } from '@/lib/supabase/client'
+import { upsertTransactions } from '@/lib/db/upsertTransactions'
 
 export async function POST(req: NextRequest) {
   const formData = await req.formData()
@@ -17,43 +17,9 @@ export async function POST(req: NextRequest) {
   }
 
   const { transactions, source } = result
+  const { inserted, error } = await upsertTransactions(transactions, file.name)
 
-  // Derive statement month/year from transactions dates
-  const dates = transactions.map(t => t.date).sort()
-  const refDate = new Date(dates[dates.length - 1] ?? new Date().toISOString())
-  const statementMonth = refDate.getMonth() + 1
-  const statementYear = refDate.getFullYear()
+  if (error) return NextResponse.json({ error }, { status: 500 })
 
-  const seen = new Set<string>()
-  const rows = transactions
-    .map(t => ({
-      date: t.date,
-      description: t.description.slice(0, 800),
-      amount: t.amount,
-      type: t.type,
-      category: t.category,
-      source: t.source,
-      source_file_name: file.name,
-      card_holder: t.cardHolder,
-      statement_month: statementMonth,
-      statement_year: statementYear,
-    }))
-    .filter(r => {
-      const key = `${r.date}|${r.amount}|${r.description}|${r.source}`
-      if (seen.has(key)) return false
-      seen.add(key); return true
-    })
-
-  const { error, data } = await supabase
-    .from('transactions')
-    .upsert(rows, { onConflict: 'date,amount,description,source', ignoreDuplicates: false })
-    .select('id')
-
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-
-  return NextResponse.json({
-    source,
-    parsed: transactions.length,
-    inserted: data?.length ?? 0,
-  })
+  return NextResponse.json({ source, parsed: transactions.length, inserted })
 }

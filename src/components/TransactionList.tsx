@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import React, { useState } from 'react'
 
 interface Transaction {
   id: string
@@ -86,7 +86,7 @@ function CopyBadge({ fileName }: { fileName: string }) {
   )
 }
 
-export function TransactionList({ transactions }: { transactions: Transaction[] }) {
+export const TransactionList = React.memo(function TransactionList({ transactions }: { transactions: Transaction[] }) {
   if (!transactions.length) {
     return <p className="text-center text-gray-400 py-8">No transactions found</p>
   }
@@ -125,4 +125,4 @@ export function TransactionList({ transactions }: { transactions: Transaction[] 
       ))}
     </div>
   )
-}
+})

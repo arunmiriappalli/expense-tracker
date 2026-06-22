@@ -1,6 +1,6 @@
 'use client'
 
-import { Suspense, useState, useEffect } from 'react'
+import { Suspense, useState, useEffect, useCallback } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { UploadDropzone } from '@/components/UploadDropzone'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -141,6 +141,7 @@ function GmailSection() {
 
 export default function UploadPage() {
   const router = useRouter()
+  const onComplete = useCallback(() => { setTimeout(() => router.push('/'), 1500) }, [router])
 
   return (
     <div className="space-y-4">
@@ -153,7 +154,7 @@ export default function UploadPage() {
 
       <Card>
         <CardContent className="pt-5 pb-5">
-          <UploadDropzone onComplete={() => setTimeout(() => router.push('/'), 1500)} />
+          <UploadDropzone onComplete={onComplete} />
         </CardContent>
       </Card>
 

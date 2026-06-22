@@ -2,15 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import type { MonthlySummaryRow } from '@/app/api/summary/route'
-
-const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
-
-function fmt(n: number) {
-  if (n === 0) return '—'
-  if (n >= 100000) return `₹${(n / 100000).toFixed(1)}L`
-  if (n >= 1000) return `₹${(n / 1000).toFixed(1)}K`
-  return `₹${Math.round(n)}`
-}
+import { fmt, MONTHS } from '@/lib/utils'
 
 export default function SummaryPage() {
   const [rows, setRows] = useState<MonthlySummaryRow[]>([])

@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Geist } from "next/font/google";
+import Link from "next/link";
 import "./globals.css";
 
 const geist = Geist({ subsets: ["latin"] });
@@ -23,9 +24,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <div className="max-w-2xl mx-auto px-4 h-12 flex items-center justify-between">
             <span className="font-semibold text-gray-900">💰 Spends</span>
             <div className="flex gap-5">
-              <a href="/" className="text-sm text-gray-600 hover:text-gray-900">Dashboard</a>
-              <a href="/summary" className="text-sm text-gray-600 hover:text-gray-900">Summary</a>
-              <a href="/upload" className="text-sm text-gray-600 hover:text-gray-900">Upload</a>
+              <Link href="/" className="text-sm text-gray-600 hover:text-gray-900">Dashboard</Link>
+              <Link href="/summary" className="text-sm text-gray-600 hover:text-gray-900">Summary</Link>
+              <Link href="/upload" className="text-sm text-gray-600 hover:text-gray-900">Upload</Link>
             </div>
           </div>
         </nav>

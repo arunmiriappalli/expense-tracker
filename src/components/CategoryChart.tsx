@@ -1,6 +1,8 @@
 'use client'
 
+import React from 'react'
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend } from 'recharts'
+import { fmt } from '@/lib/utils'
 
 const COLORS = [
   '#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6',
@@ -11,13 +13,7 @@ interface Props {
   data: Record<string, number>
 }
 
-function fmt(n: number) {
-  if (n >= 100000) return `₹${(n / 100000).toFixed(1)}L`
-  if (n >= 1000) return `₹${(n / 1000).toFixed(1)}K`
-  return `₹${n.toFixed(0)}`
-}
-
-export function CategoryChart({ data }: Props) {
+export const CategoryChart = React.memo(function CategoryChart({ data }: Props) {
   const entries = Object.entries(data)
     .filter(([name]) => name !== 'Investments')
     .sort((a, b) => b[1] - a[1])
@@ -52,4 +48,4 @@ export function CategoryChart({ data }: Props) {
       </PieChart>
     </ResponsiveContainer>
   )
-}
+})

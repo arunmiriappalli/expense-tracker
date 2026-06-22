@@ -1,5 +1,6 @@
 import { ParsedTransaction } from '@/types'
 import { categorize } from '@/lib/categorize'
+import { pa, toIsoDate } from './utils'
 
 // pdfjs produces one item per line; each transaction spans 3-4 lines:
 //   DD/MM/YYYY
@@ -11,15 +12,6 @@ import { categorize } from '@/lib/categorize'
 const DATE_LINE = /^\d{2}\/\d{2}\/\d{4}$/
 const AMOUNT_LINE = /^([\d,]+\.\d{2})\s*(Dr|Cr)$/i // case-insensitive; space before Dr/Cr optional
 const STOP = /^-+End of the Statement/i
-
-function toIsoDate(d: string): string {
-  const [dd, mm, yyyy] = d.split('/')
-  return `${yyyy}-${mm}-${dd}`
-}
-
-function pa(s: string): number {
-  return parseFloat(s.replace(/,/g, ''))
-}
 
 function cleanDesc(raw: string): string {
   return raw

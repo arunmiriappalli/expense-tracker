@@ -28,5 +28,5 @@ export async function GET() {
     investSpouse: Number(r.invest_spouse),
   }))
 
-  return NextResponse.json(rows)
+  return NextResponse.json(rows, { headers: { 'Cache-Control': 'private, max-age=60, stale-while-revalidate=300' } })
 }
